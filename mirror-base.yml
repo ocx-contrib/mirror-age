@@ -92,10 +92,9 @@ platforms:
     runner: macos-14
     shell: bash
   #
-  # PASS 3 — uncomment together with the windows `assets:` pattern.
-  # windows/amd64:
-  #   runner: windows-latest
-  #   shell: pwsh
+  windows/amd64:
+    runner: windows-latest
+    shell: pwsh
   #
   # No windows/arm64 in ANY pass: upstream ships no
   # `age-vX.Y.Z-windows-arm64.zip` on any in-range release (full asset lists of

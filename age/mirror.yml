@@ -83,9 +83,8 @@ assets:
     - "^age-v.*-darwin-amd64\\.tar\\.gz$"
   darwin/arm64:
     - "^age-v.*-darwin-arm64\\.tar\\.gz$"
-  # PASS 3 — uncomment together with the windows `platforms:` key.
-  # windows/amd64:
-  #   - "^age-v.*-windows-amd64\\.zip$"
+  windows/amd64:
+    - "^age-v.*-windows-amd64\\.zip$"
 
 # Every archive — tarball and zip alike, on every platform and on both in-range
 # releases — is a single `age/` wrapper holding the four executables (mode
