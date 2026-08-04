@@ -79,11 +79,10 @@ assets:
     - "^age-v.*-linux-amd64\\.tar\\.gz$"
   linux/arm64:
     - "^age-v.*-linux-arm64\\.tar\\.gz$"
-  # PASS 2 — uncomment together with the darwin `platforms:` keys.
-  # darwin/amd64:
-  #   - "^age-v.*-darwin-amd64\\.tar\\.gz$"
-  # darwin/arm64:
-  #   - "^age-v.*-darwin-arm64\\.tar\\.gz$"
+  darwin/amd64:
+    - "^age-v.*-darwin-amd64\\.tar\\.gz$"
+  darwin/arm64:
+    - "^age-v.*-darwin-arm64\\.tar\\.gz$"
   # PASS 3 — uncomment together with the windows `platforms:` key.
   # windows/amd64:
   #   - "^age-v.*-windows-amd64\\.zip$"
