@@ -38,17 +38,6 @@ binary.
   encryption driven by `AGE_PASSPHRASE` / `AGE_PASSPHRASE_FD`, for scripted
   and CI use where no terminal is available to prompt.
 
-## Install with ocx
-
-```sh
-ocx install ocx.sh/age/age
-```
-
-```sh
-# or pin a specific version
-ocx install ocx.sh/age/age:1.3.1
-```
-
 ## Links
 
 - [age on GitHub](https://github.com/FiloSottile/age)
