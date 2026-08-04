@@ -12,19 +12,31 @@ EXE = ".exe" if ocx.target_platform.os == ocx.os.Windows else ""
 AGE = "age" + EXE
 KEYGEN = "age-keygen" + EXE
 INSPECT = "age-inspect" + EXE
-PLUGIN = "age-plugin-batchpass" + EXE
+# No constant for `age-plugin-batchpass`: it is never invoked directly. `age -j
+# batchpass` resolves `age-plugin-batchpass[.exe]` off the composed PATH itself
+# and speaks the plugin protocol to it (Tier 3f), which is what proves the
+# fourth declared binary shipped, is executable, and works.
 
-# Tier 1 + 2: every declared binary is on the composed PATH and reports a
-# version SHAPE. Not the banner, not the exact version — the digits are the
-# contract. (`for` is legal inside a `def`; a top-level `for` STATEMENT is a
-# parse error in this Bazel dialect and would red every leg at load time.)
-def check_all_binaries_live():
-    for tool in [AGE, KEYGEN, INSPECT, PLUGIN]:
+# Tier 1 + 2: every declared binary that HAS a version flag is on the composed
+# PATH and reports a version SHAPE. Not the banner, not the exact version — the
+# digits are the contract. (`for` is legal inside a `def`; a top-level `for`
+# STATEMENT is a parse error in this Bazel dialect and would red every leg at
+# load time.)
+#
+# PLUGIN is deliberately absent from this loop: `age-plugin-batchpass` grew its
+# `--version` flag only in v1.3.1, and on v1.3.0 — inside this mirror's range —
+# it exits 2 with `flag provided but not defined: -version`. It is an age PLUGIN
+# rather than a CLI, so a version banner was never its interface. Its liveness
+# is proven FUNCTIONALLY and far more strongly in Tier 3f below: a full
+# encrypt/decrypt round trip THROUGH the plugin protocol, which a missing,
+# non-executable or broken plugin binary cannot pass.
+def check_versioned_binaries_live():
+    for tool in [AGE, KEYGEN, INSPECT]:
         r = ocx.run(tool, "--version")
         expect.ok(r)
         expect.matches(r.stdout, r"\d+\.\d+\.\d+")
 
-check_all_binaries_live()
+check_versioned_binaries_live()
 
 # Tier 3a: age-keygen must emit a real X25519 identity — a fixed-length bech32
 # public key, not merely some output. The parsed key is what every assertion
