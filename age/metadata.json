@@ -1,0 +1,14 @@
+{
+  "type": "bundle",
+  "version": 1,
+  "binaries": ["age", "age-inspect", "age-keygen", "age-plugin-batchpass"],
+  "env": [
+    {
+      "key": "PATH",
+      "type": "path",
+      "required": true,
+      "value": "${installPath}",
+      "visibility": "public"
+    }
+  ]
+}

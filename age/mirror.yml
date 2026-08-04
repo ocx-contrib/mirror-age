@@ -1,0 +1,161 @@
+# ⚠ `extends:` is a SHALLOW merge of TOP-LEVEL KEYS. Setting a key here
+# REPLACES the base's block outright — there is no per-key merge. `platforms:`
+# is deliberately NOT restated below: it carries the container legs that make
+# this spec's libc claims honest, and restating it to tweak one runner would
+# drop them all without reddening anything. This repo is single-package, so the
+# measured matrix lives in the base and nothing here touches it.
+extends: ../mirror-base.yml
+
+name: age
+
+# Logical index package `age/age` at the physical path
+# `ghcr.io/ocx-contrib/age/age` — slash segments, never hyphen-flattened. Two
+# segments always; `FiloSottile` is a personal handle, not a vendor, so the
+# tool names itself. The first segment must be this repo's own GitHub owner:
+# GITHUB_TOKEN only authorises packages owned by the repo the workflow runs in.
+target:
+  registry: ghcr.io
+  repository: ocx-contrib/age/age
+
+source:
+  type: github_release
+  owner: FiloSottile
+  repo: age
+  # age tags are `v`-prefixed semver (e.g. "v1.3.1"). The anchored pattern also
+  # rejects every `v1.0.0-rc.1` / `-betaN` prerelease tag on its own, before
+  # `skip_prereleases` gets a say.
+  tag_pattern: "^v(?P<version>\\d+\\.\\d+\\.\\d+)$"
+
+# ─── libc gate (Phase 3.5) — the evidence, not the conclusion ───────────────
+#
+# `os.features` states what an artifact REQUIRES OF THE HOST. Measured on ALL
+# FOUR declared binaries × both Linux arches × both in-range releases — 16
+# artifacts, all identical:
+#
+#   $ file x-1.3.1-amd64/age/age
+#   ELF 64-bit LSB executable, x86-64, version 1 (SYSV), statically linked,
+#   BuildID[sha1]=793e3d52…, with debug_info, not stripped
+#   $ readelf -l x-1.3.1-amd64/age/age | grep -c INTERP   → 0
+#   $ readelf -d x-1.3.1-amd64/age/age | grep -c NEEDED   → 0
+#   (same for age-keygen, age-inspect, age-plugin-batchpass; same on
+#    x-1.3.0-amd64, x-1.3.0-arm64, x-1.3.1-arm64 — 16/16 INTERP=0 NEEDED=0)
+#
+#   ⇒ CGO-disabled Go static builds: they require NOTHING of the host userland
+#     → BARE `linux/amd64` and BARE `linux/arm64`. `+libc.musl` would be a
+#     false requirement hiding the package from every glibc host it runs on;
+#     `+libc.glibc` would hide it from musl. The alpine container leg on both
+#     arches (mirror-base.yml) is what turns that universality claim into
+#     evidence rather than an assertion.
+#
+# ─── Scope (verified against v1.3.0, the floor, and v1.3.1, the newest) ─────
+#
+# Each pattern below matches EXACTLY ONE asset on EVERY in-range release,
+# re-listed from the API on 2026-08-04 rather than taken from recon:
+#
+#   $ gh api repos/FiloSottile/age/releases/tags/v1.3.0 --jq '.assets[].name' \
+#       | grep -cE '^age-v.*-linux-amd64\.tar\.gz$'    → 1   (and 1 on v1.3.1)
+#   … likewise linux-arm64, darwin-amd64, darwin-arm64, windows-amd64.zip
+#
+# A pattern matching ZERO is silently skipped, not an error — it would yield a
+# green run with a missing platform. A pattern matching TWO is a hard ambiguous
+# error, and that is the live hazard here: EVERY real asset is paired 1:1 with
+# a `*.proof` sigsum transparency-log signature. The terminating `\.tar\.gz$` /
+# `\.zip$` anchor is the ONLY thing keeping `age-v1.3.1-linux-amd64.tar.gz.proof`
+# out of the linux/amd64 set — unanchored, every platform would resolve two
+# assets and the run would die.
+#
+# Upstream also publishes, and this mirror deliberately does not carry:
+#   age-vX.Y.Z-freebsd-amd64.tar.gz   — FreeBSD; OCX has no freebsd OS key, so
+#                                       there is no way to express it and no
+#                                       GitHub runner that could test it
+#   age-vX.Y.Z-linux-arm.tar.gz       — a single unqualified 32-bit `arm` build;
+#                                       OCX's Architecture enum is amd64|arm64
+#   age-vX.Y.Z-source.tar.gz          — source snapshot, not a platform binary
+#   *.proof                           — sigsum sidecars, one per asset above
+#
+# No `windows/arm64` asset exists on any in-range release, so none is declared.
+assets:
+  linux/amd64:
+    - "^age-v.*-linux-amd64\\.tar\\.gz$"
+  linux/arm64:
+    - "^age-v.*-linux-arm64\\.tar\\.gz$"
+  # PASS 2 — uncomment together with the darwin `platforms:` keys.
+  # darwin/amd64:
+  #   - "^age-v.*-darwin-amd64\\.tar\\.gz$"
+  # darwin/arm64:
+  #   - "^age-v.*-darwin-arm64\\.tar\\.gz$"
+  # PASS 3 — uncomment together with the windows `platforms:` key.
+  # windows/amd64:
+  #   - "^age-v.*-windows-amd64\\.zip$"
+
+# Every archive — tarball and zip alike, on every platform and on both in-range
+# releases — is a single `age/` wrapper holding the four executables (mode
+# 0755; `.exe` on Windows) at its ROOT beside a `LICENSE` file, with no `bin/`
+# and no nesting:
+#
+#   $ tar tzvf age-v1.3.1-linux-amd64.tar.gz
+#   drwxr-xr-x  age/
+#   -rw-r--r--  age/LICENSE
+#   -rwxr-xr-x  age/age-inspect  age/age-plugin-batchpass  age/age  age/age-keygen
+#
+# One strip_components: 1 therefore serves every platform, the executables land
+# at the content root, and a single metadata.json (PATH = ${installPath})
+# serves all of them — no per-platform metadata override.
+asset_type:
+  type: archive
+  strip_components: 1
+
+# `off` — FORCED by the layout above, not chosen. After the strip the bundle's
+# only PATH entry is a bare ${installPath}; the scan only inspects an
+# interface-visible `${installPath}/<dir>` entry, so with no subdirectory to
+# point one at both `auto` and `verify` fail spec load at exit 65:
+#
+#   bin_scan is enabled but metadata.json declares no interface-visible
+#   ${installPath}/<dir> PATH entry — the verification would inspect no file and
+#   pass green whatever the archive contains.
+#
+# The `binaries` list in metadata.json is therefore hand-maintained, exactly as
+# that error directs, and taken from the archive listing above rather than from
+# upstream's README: age, age-keygen, age-inspect, age-plugin-batchpass — the
+# archive's only mode-0755 entries; LICENSE is 0644 data. That set is uniform
+# across the whole declared range, which is WHY the floor is 1.3.0: v1.2.x
+# ships only age + age-keygen, so a 1.2.1 floor would make two of the four
+# declared binaries a false claim on every backfilled version.
+# Quoted so no YAML 1.1 reader folds the bare word into boolean `false`.
+bin_scan: "off"
+
+metadata:
+  default: metadata.json
+
+catalog:
+  logo: logo.svg
+
+versions:
+  # 1.3.0 is the floor because the ARCHIVE CONTENTS change there, not the asset
+  # names: v1.2.x ships `age/{LICENSE,age,age-keygen}` (2 binaries) while
+  # v1.3.0+ ships those plus `age-inspect` and `age-plugin-batchpass` (4). A
+  # single hand-listed `binaries` claim cannot be true of both, and the floor is
+  # what makes it uniform. Both in-range releases (1.3.0, 1.3.1) carry a
+  # complete asset set for every declared platform — an asset-less release
+  # inside the range would be dropped SILENTLY by the pipeline.
+  min: "1.3.0"
+  new_per_run: 5
+  poll_interval: "23 */6 * * *"
+
+tests:
+  # `script:` resolves from the REPOSITORY ROOT — unlike `metadata.default` and
+  # `catalog.logo` above, which resolve against this spec's own directory.
+  - name: smoke
+    script: age/tests/smoke.star
+
+annotations:
+  # From the Phase 1.5 license gate:
+  #   $ gh api repos/FiloSottile/age/license --jq '.license.spdx_id'
+  #   BSD-3-Clause
+  org.opencontainers.image.licenses: "BSD-3-Clause"
+
+announce:
+  # Spelled out, not derived from target.repository — the logical name and the
+  # physical path are related by convention only.
+  package: age/age
+  fork: ocx-contrib/index
